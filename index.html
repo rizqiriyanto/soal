@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Soal Ujian Madrasah AI - Standar Juknis SAS MI</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icon Library -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- External Libraries for Multi-Format Document Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+        }
+
+        /* Standard F4 / Folio Paper Preview (21.5cm x 33cm) */
+        .paper-f4 {
+            background-color: #ffffff;
+            color: #1e293b;
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 12pt;
+            line-height: 1.5;
+            padding: 2.5cm 2cm 2cm 2cm;
+            width: 21.5cm;
+            min-height: 33cm;
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.6);
+            border-radius: 4px;
+            margin: 0 auto;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        /* Live Edit Mode Visual Highlight */
+        .paper-f4[contenteditable="true"] {
+            outline: 3px dashed #10b981;
+            outline-offset: 4px;
+            background-color: #f8fafc;
+        }
+
+        /* Paper Tables Styling according to Juknis */
+        .paper-f4 table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 8px;
+            margin-bottom: 12px;
+            page-break-inside: avoid;
+        }
+
+        .paper-f4 th, .paper-f4 td {
+            border: 1px solid #000000;
+            padding: 6px 8px;
+            font-size: 11pt;
+            vertical-align: top;
+        }
+
+        .kop-header {
+            border-bottom: 3px double #000000;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .pg-bawah-option {
+            display: block;
+            margin-left: 1.5rem;
+            margin-top: 2px;
+        }
+
+        /* Print Media Query for Exact F4 Print Output */
+        @media print {
+            @page {
+                size: 215mm 330mm; /* Kertas F4 / Folio */
+                margin: 1.5cm;
+            }
+            body {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .paper-f4 {
+                box-shadow: none !important;
+                padding: 0 !important;
+                width: 100% !important;
+                min-height: auto !important;
+                outline: none !important;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-full flex flex-col text-slate-100 antialiased">
+
+    <!-- HEADER NAVBAR -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 no-print">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base text-slate-100 flex items-center gap-2">
+                        Generator Soal SAS <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Juknis Resmi MI</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Penyusun Naskah Soal SAS Genap (Kertas F4 / Arial 12 / Spasi 1,5)</p>
+                </div>
+            </div>
+
+            <!-- ACTION BUTTONS -->
+            <div class="flex items-center flex-wrap gap-2">
+                <button onclick="toggleEditMode()" id="btn-edit-mode" disabled class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-pen-to-square"></i> <span id="text-edit-mode">Mode Edit (Off)</span>
+                </button>
+
+                <button onclick="exportToWord()" id="btn-export-word" disabled class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow">
+                    <i class="fa-solid fa-file-word"></i> Ekspor Word (.doc)
+                </button>
+
+                <button onclick="window.print()" id="btn-print" disabled class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow">
+                    <i class="fa-solid fa-print"></i> Cetak F4 / PDF
+                </button>
+
+                <button onclick="copyGeneratedText()" id="btn-copy" disabled class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700">
+                    <i class="fa-solid fa-copy"></i> Salin Teks
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- MAIN LAYOUT -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- LEFT PANEL: PARAMETERS & FILE UPLOAD (5 COLS) -->
+        <div class="lg:col-span-5 no-print space-y-4">
+            <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-5 space-y-4 backdrop-blur-md shadow-xl">
+                
+                <div class="border-b border-slate-700 pb-3 flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders"></i> Parameter & Identitas Ujian
+                    </h2>
+                    <span class="text-[10px] bg-slate-900 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30 font-mono">Format F4 / Arial 12</span>
+                </div>
+
+                <!-- API KEY CONFIGURATION INPUT (OTOMATIS) -->
+                <div class="space-y-1">
+                    <label class="block text-slate-300 text-xs font-semibold flex items-center justify-between">
+                        <span><i class="fa-solid fa-key text-amber-400 mr-1"></i> API Key Google Gemini</span>
+                        <span class="text-[10px] text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> Terpasang Otomatis</span>
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="inp-api-key" onchange="saveApiKey()" placeholder="API Key Terisi Otomatis..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-3 pr-8 py-2 text-xs text-amber-300 font-mono focus:border-emerald-500 focus:outline-none">
+                        <button type="button" onclick="toggleApiKeyVisibility()" class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-200 text-xs">
+                            <i class="fa-solid fa-eye" id="icon-toggle-key"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FORM IDENTITAS NASKAH -->
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div class="col-span-2">
+                        <label class="block text-slate-400 font-medium mb-1">Nama Madrasah / Sekolah</label>
+                        <input type="text" id="inp-madrasah" value="MADRASAH IBTIDAIYAH MIFTAHUL ULUM" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Mata Pelajaran</label>
+                        <input type="text" id="inp-mapel" placeholder="Contoh: IPAS / Akidah Akhlak" value="IPAS (Ilmu Pengetahuan Alam & Sosial)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Tingkat Kelas (Juknis)</label>
+                        <select id="inp-kelas" onchange="updateJuknisInfo()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-emerald-400 font-bold focus:border-emerald-500 focus:outline-none">
+                            <optgroup label="Kelas Bawah (35 Soal)">
+                                <option value="1">Kelas 1 (Kelas Bawah)</option>
+                                <option value="2">Kelas 2 (Kelas Bawah)</option>
+                                <option value="3" selected>Kelas 3 (Kelas Bawah)</option>
+                            </optgroup>
+                            <optgroup label="Kelas Atas (45 Soal)">
+                                <option value="4">Kelas 4 (Kelas Atas)</option>
+                                <option value="5">Kelas 5 (Kelas Atas)</option>
+                                <option value="6">Kelas 6 (Kelas Atas)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Semester & Tahun</label>
+                        <input type="text" id="inp-semester" value="Genap (SAS) / 2025-2026" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 font-medium mb-1">Alokasi Waktu</label>
+                        <input type="text" id="inp-waktu" value="90 Menit" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:border-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- DYNAMIC JUKNIS RULES DISPLAY CARD -->
+                <div id="juknis-rule-box" class="p-3 bg-slate-900/90 border border-emerald-500/40 rounded-xl space-y-1.5 text-xs">
+                    <!-- Dynamic Javascript Content Here -->
+                </div>
+
+                <!-- UPLOAD FILE KISI-KISI MULTI-FORMAT -->
+                <div class="p-3 bg-slate-900/80 border border-slate-700/80 rounded-xl space-y-2">
+                    <label class="block text-xs font-semibold text-slate-300 flex items-center justify-between">
+                        <span><i class="fa-solid fa-file-arrow-up text-indigo-400 mr-1"></i> Upload File Kisi-Kisi</span>
+                        <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30">Word, Excel, PDF, Foto</span>
+                    </label>
+                    <input type="file" id="inp-file-kisikisi" accept=".docx, .xlsx, .xls, .pdf, image/*" onchange="handleFileUpload(event)" class="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer">
+                    <p id="upload-status" class="text-[10px] text-emerald-400 italic font-medium"></p>
+                </div>
+
+                <!-- INPUT MATRIKS KISI-KISI / CP-TP -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold text-slate-200">
+                            <i class="fa-solid fa-list-check text-emerald-400 mr-1"></i> Tempel Kisi-Kisi / Materi
+                        </label>
+                        <button onclick="loadSampleKisiKisi()" class="text-[11px] text-emerald-400 hover:text-emerald-300 font-medium underline">
+                            Muat Contoh Kisi-kisi
+                        </button>
+                    </div>
+                    <textarea id="inp-kisikisi" rows="6" placeholder="Tempelkan daftar Capaian Pembelajaran (CP), Tujuan Pembelajaran (TP), atau isi kisi-kisi soal di sini..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-slate-200 font-mono focus:border-emerald-500 focus:outline-none leading-relaxed"></textarea>
+                    <p class="text-[10px] text-slate-400">
+                        *AI akan membagi porsi materi **40% Sem 1 & 60% Sem 2** serta mengatur level kognitif L1 (30%), L2 (50%), & L3 (20%).
+                    </p>
+                </div>
+
+                <!-- TOMBOL GENERATE -->
+                <button id="btn-generate" onclick="generateExamPaper()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-300 text-sm"></i> Generate Naskah Soal AI (Sesuai Juknis)
+                </button>
+
+                <!-- STATUS PROGRESS -->
+                <div id="status-box" class="hidden p-3 bg-slate-900 border border-emerald-500/30 rounded-lg space-y-1 text-xs">
+                    <div class="flex items-center gap-2 text-emerald-400 font-semibold">
+                        <i class="fa-solid fa-circle-notch animate-spin"></i>
+                        <span id="status-text">Menghubungkan ke Gemini AI...</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400">Proses penyusunan naskah soal presisi Juknis memerlukan waktu ~15-30 detik.</p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: NASKAH SOAL & KUNCI PREVIEW (7 COLS) -->
+        <div class="lg:col-span-7 flex flex-col space-y-4">
+            
+            <!-- TABS REVIEW -->
+            <div class="no-print bg-slate-800 border border-slate-700 p-1.5 rounded-xl flex gap-1 text-xs font-semibold">
+                <button onclick="switchTab('tab-soal')" id="btn-tab-soal" class="flex-1 py-2 rounded-lg bg-emerald-600 text-white shadow flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-file-lines"></i> 📄 Naskah Soal SAS (F4)
+                </button>
+                <button onclick="switchTab('tab-kunci')" id="btn-tab-kunci" class="flex-1 py-2 rounded-lg bg-slate-900 text-slate-400 hover:text-white flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-key"></i> 🗝️ Kunci Jawaban & Rubrik
+                </button>
+            </div>
+
+            <!-- PAPER PREVIEW CONTAINER -->
+            <div id="paper-container" class="flex-1 overflow-y-auto max-h-[85vh] p-2 sm:p-4 bg-slate-950 rounded-xl border border-slate-800 flex justify-center">
+                
+                <!-- NASKAH SOAL SHEET (F4 FORMAT) -->
+                <div id="view-soal" class="paper-f4">
+                    <div id="paper-content">
+                        <!-- DEFAULT EMPTY STATE -->
+                        <div class="text-center py-20 space-y-4 text-slate-400 font-sans no-print">
+                            <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+                                <i class="fa-solid fa-file-signature text-3xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-700">Naskah Soal Belum Digenerate</h3>
+                                <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Masukkan API Key Gemini, pilih kelas, unggah/tempel kisi-kisi materi, lalu klik "Generate Naskah Soal AI".</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KUNCI JAWABAN SHEET -->
+                <div id="view-kunci" class="paper-f4 hidden">
+                    <div id="kunci-content">
+                        <div class="text-center py-20 text-slate-400 font-sans no-print">
+                            <p class="text-xs">Kunci jawaban dan pedoman penskoran resmi akan tampil di sini setelah naskah soal dibuat.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <script>
+        // Set PDF.js Worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        let generatedData = {
+            soalHtml: "",
+            kunciHtml: ""
+        };
+
+        let selectedBase64Image = null;
+        let isEditModeActive = false;
+
+        // API Key Default Terpasang Otomatis (Tanpa Wajib Input Manual)
+        const DEFAULT_API_KEY = "AQ.Ab8RN6J0oS6Dw20aZNg2wH5HTbfIVgtDP0j_pyu4B3xSCuRzHQ";
+
+        window.onload = function() {
+            // Load saved API Key or use default automatic key
+            const savedApiKey = localStorage.getItem('gemini_api_key') || DEFAULT_API_KEY;
+            document.getElementById('inp-api-key').value = savedApiKey;
+            updateJuknisInfo();
+        };
+
+        function saveApiKey() {
+            const apiKey = document.getElementById('inp-api-key').value.trim();
+            localStorage.setItem('gemini_api_key', apiKey || DEFAULT_API_KEY);
+            showToast("API Key Gemini tersimpan di browser!", "success");
+        }
+
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('inp-api-key');
+            const icon = document.getElementById('icon-toggle-key');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-solid fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-solid fa-eye';
+            }
+        }
+
+        function updateJuknisInfo() {
+            const kelasVal = parseInt(document.getElementById('inp-kelas').value);
+            const box = document.getElementById('juknis-rule-box');
+            const isKelasBawah = kelasVal <= 3;
+
+            if (isKelasBawah) {
+                box.innerHTML = `
+                    <div class="flex items-center justify-between text-amber-400 font-bold border-b border-slate-800 pb-1">
+                        <span><i class="fa-solid fa-circle-info mr-1"></i> Standar Juknis Kelas Bawah (Kelas ${kelasVal})</span>
+                        <span class="bg-amber-500/20 px-2 py-0.5 rounded text-[10px]">35 Soal (Skor 100)</span>
+                    </div>
+                    <ul class="text-[11px] text-slate-300 space-y-0.5 list-disc list-inside pt-1">
+                        <li><b>15 PG Murni</b> (Opsi A, B, C ditulis ke bawah) [Skor 2 = 30]</li>
+                        <li><b>5 PG Kompleks</b> (Opsi angka 1, 2, 3) [Skor 2 = 10]</li>
+                        <li><b>5 Benar/Salah</b> (1 Pernyataan per nomor) [Skor 2 = 10]</li>
+                        <li><b>5 Essay / Isian Singkat</b> [Skor 3 = 15]</li>
+                        <li><b>5 Uraian HOTS</b> [Skor 7 = 35]</li>
+                    </ul>
+                `;
+            } else {
+                box.innerHTML = `
+                    <div class="flex items-center justify-between text-emerald-400 font-bold border-b border-slate-800 pb-1">
+                        <span><i class="fa-solid fa-circle-info mr-1"></i> Standar Juknis Kelas Atas (Kelas ${kelasVal})</span>
+                        <span class="bg-emerald-500/20 px-2 py-0.5 rounded text-[10px]">45 Soal (Skor 100)</span>
+                    </div>
+                    <ul class="text-[11px] text-slate-300 space-y-0.5 list-disc list-inside pt-1">
+                        <li><b>20 PG Murni</b> (Opsi A, B, C, D) [Skor 1 = 20]</li>
+                        <li><b>5 PG Kompleks</b> (Opsi angka 1, 2, 3, 4) [Skor 2 = 10]</li>
+                        <li><b>5 Menjodohkan</b> (Tabel Premis & Jawaban) [Skor 2 = 10]</li>
+                        <li><b>5 Benar/Salah</b> (3 Pernyataan per nomor) [Skor 3 = 15]</li>
+                        <li><b>5 Essay / Isian Singkat</b> [Skor 4 = 20]</li>
+                        <li><b>5 Uraian HOTS</b> [Skor 5 = 25]</li>
+                    </ul>
+                `;
+            }
+        }
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusEl = document.getElementById('upload-status');
+            const textArea = document.getElementById('inp-kisikisi');
+            const ext = file.name.split('.').pop().toLowerCase();
+
+            statusEl.innerText = "Membaca berkas kisi-kisi...";
+            selectedBase64Image = null;
+
+            try {
+                // 1. File Word (.docx)
+                if (ext === 'docx') {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                    textArea.value = result.value;
+                    statusEl.innerText = "✓ Berhasil membaca teks dari file Word!";
+                    showToast("Teks dari Word berhasil dimuat!", "success");
+                }
+                // 2. File Excel (.xlsx / .xls)
+                else if (ext === 'xlsx' || ext === 'xls') {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                    let extractedText = "";
+                    workbook.SheetNames.forEach(sheetName => {
+                        const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName]);
+                        extractedText += `--- SHEET: ${sheetName} ---\n` + csv + "\n\n";
+                    });
+                    textArea.value = extractedText;
+                    statusEl.innerText = "✓ Berhasil membaca tabel dari file Excel!";
+                    showToast("Tabel dari Excel berhasil dimuat!", "success");
+                }
+                // 3. File PDF (.pdf)
+                else if (ext === 'pdf') {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    let fullText = "";
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        fullText += `--- Halaman ${i} ---\n` + pageText + "\n\n";
+                    }
+                    textArea.value = fullText;
+                    statusEl.innerText = "✓ Berhasil membaca teks dari file PDF!";
+                    showToast("Teks dari PDF berhasil dimuat!", "success");
+                }
+                // 4. File Foto (JPG / PNG)
+                else if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        selectedBase64Image = e.target.result;
+                        statusEl.innerText = "✓ Foto kisi-kisi berhasil dimuat (Akan dibaca via OCR AI)";
+                        showToast("Foto kisi-kisi siap diproses AI!", "info");
+                    };
+                    reader.readAsDataURL(file);
+                }
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = "Gagal membaca berkas: " + err.message;
+                showToast("Gagal membaca file: " + err.message, "error");
+            }
+        }
+
+        function switchTab(tab) {
+            const viewSoal = document.getElementById('view-soal');
+            const viewKunci = document.getElementById('view-kunci');
+            const btnSoal = document.getElementById('btn-tab-soal');
+            const btnKunci = document.getElementById('btn-tab-kunci');
+
+            if (tab === 'tab-soal') {
+                viewSoal.classList.remove('hidden');
+                viewKunci.classList.add('hidden');
+                btnSoal.className = "flex-1 py-2 rounded-lg bg-emerald-600 text-white shadow flex items-center justify-center gap-2";
+                btnKunci.className = "flex-1 py-2 rounded-lg bg-slate-900 text-slate-400 hover:text-white flex items-center justify-center gap-2";
+            } else {
+                viewSoal.classList.add('hidden');
+                viewKunci.classList.remove('hidden');
+                btnKunci.className = "flex-1 py-2 rounded-lg bg-emerald-600 text-white shadow flex items-center justify-center gap-2";
+                btnSoal.className = "flex-1 py-2 rounded-lg bg-slate-900 text-slate-400 hover:text-white flex items-center justify-center gap-2";
+            }
+        }
+
+        function loadSampleKisiKisi() {
+            const kelasVal = parseInt(document.getElementById('inp-kelas').value);
+            if (kelasVal <= 3) {
+                document.getElementById('inp-mapel').value = "IPAS (Ilmu Pengetahuan Alam & Sosial)";
+                document.getElementById('inp-kisikisi').value = `1. Simbol & Sila Pancasila dalam Kehidupan Sehari-hari (Sem 1 - 40%).
+2. Aturan dan Hak Serta Kewajiban di Rumah dan Sekolah (Sem 1 - 40%).
+3. Mengenal Bagian Tubuh Tumbuhan dan Hewan di Sekitar (Sem 2 - 60%).
+4. Wujud Benda, Perubahan Bentuk, dan Sifat Benda (Sem 2 - 60%).
+5. Denah Lingkungan Rumah dan Sekolah (Sem 2 - 60%).`;
+            } else {
+                document.getElementById('inp-mapel').value = "IPAS (Ilmu Pengetahuan Alam & Sosial)";
+                document.getElementById('inp-kisikisi').value = `1. Rantai Makanan & Ekosistem Lingkungan (Sem 1 - 40%).
+2. Tata Surya, Urutan Planet, Rotasi & Revolusi Bumi (Sem 1 - 40%).
+3. Gaya, Magnet, dan Perubahan Bentuk Energi Listrik (Sem 2 - 60%).
+4. Perkembangbiakan Generatif & Vegetatif Tumbuhan dan Hewan (Sem 2 - 60%).
+5. Upaya Pelestarian Alam dan Pencegahan Pencemaran Lingkungan (Sem 2 - 60%).`;
+            }
+            showToast("Contoh kisi-kisi materi berhasil dimuat!", "info");
+        }
+
+        async function generateExamPaper() {
+            let apiKey = document.getElementById('inp-api-key').value.trim();
+            if (!apiKey) {
+                apiKey = DEFAULT_API_KEY;
+                document.getElementById('inp-api-key').value = apiKey;
+            }
+
+            const madrasah = document.getElementById('inp-madrasah').value.trim();
+            const mapel = document.getElementById('inp-mapel').value.trim();
+            const kelasNum = parseInt(document.getElementById('inp-kelas').value);
+            const semester = document.getElementById('inp-semester').value.trim();
+            const waktu = document.getElementById('inp-waktu').value.trim();
+            const kisikisi = document.getElementById('inp-kisikisi').value.trim();
+
+            const isKelasBawah = kelasNum <= 3;
+
+            if (!mapel || (!kisikisi && !selectedBase64Image)) {
+                showToast("Mohon isi nama mata pelajaran dan kisi-kisi materi terlebih dahulu!", "error");
+                return;
+            }
+
+            const statusBox = document.getElementById('status-box');
+            const statusText = document.getElementById('status-text');
+            const btnGen = document.getElementById('btn-generate');
+
+            statusBox.classList.remove('hidden');
+            statusText.innerText = "Menghubungkan ke Gemini AI sesuai Juknis SAS...";
+            btnGen.disabled = true;
+
+            try {
+                let juknisInstruction = "";
+
+                if (isKelasBawah) {
+                    juknisInstruction = `
+STANDAR KHUSUS KELAS BAWAH (Kelas ${kelasNum}):
+- TOTAL SOAL: 35 SOAL (SKOR MAKSIMAL = 100)
+- CAKUPAN MATERI: 40% Semester 1 & 60% Semester 2.
+- STRUKTUR BAGIAN NASKAH SOAL:
+  1. Bagian I: 15 Pilihan Ganda Murni (Skor 2/soal). 
+     - Gunakan opsi A, B, C (3 Pilihan) yang DITULIS MEMANJANG KE BAWAH (Gunakan <span class="pg-bawah-option">A. ...</span> <span class="pg-bawah-option">B. ...</span> <span class="pg-bawah-option">C. ...</span>).
+     - Kunci jawaban A, B, C terdistribusi seimbang (minimal 2, maksimal 8 per opsi).
+  2. Bagian II: 5 Pilihan Ganda Kompleks (Skor 2/soal). Opsi menggunakan angka 1, 2, 3. Siswa boleh memilih lebih dari satu.
+  3. Bagian III: 5 Benar / Salah (Skor 2/soal). Setiap nomor HANYA BERISI 1 PERNYATAAN SINGKAT.
+  4. Bagian IV: 5 Essay / Isian Singkat (Skor 3/soal).
+  5. Bagian V: 5 Uraian (Skor 7/soal). Menuntut penjelasan sederhana HOTS.
+  *(CATATAN: TIDAK ADA MENJODOHKAN UNTUK KELAS BAWAH)*
+`;
+                } else {
+                    juknisInstruction = `
+STANDAR KHUSUS KELAS ATAS (Kelas ${kelasNum}):
+- TOTAL SOAL: 45 SOAL (SKOR MAKSIMAL = 100)
+- CAKUPAN MATERI: 40% Semester 1 & 60% Semester 2.
+- STRUKTUR BAGIAN NASKAH SOAL:
+  1. Bagian I: 20 Pilihan Ganda Murni (Skor 1/soal). Opsi A, B, C, D (4 Pilihan). Kunci jawaban terdistribusi seimbang (minimal 2, maksimal 8 per opsi).
+  2. Bagian II: 5 Pilihan Ganda Kompleks (Skor 2/soal). Opsi menggunakan angka 1, 2, 3, 4.
+  3. Bagian III: 5 Menjodohkan (Skor 2/soal). Format tabel menghubungkan Premis (Kolom A) dan Jawaban (Kolom B).
+  4. Bagian IV: 5 Benar / Salah (Skor 3/soal). Format tabel berisi 3 PERNYATAAN per nomor soal dengan stimulus cerita pendek.
+  5. Bagian V: 5 Essay / Isian Singkat (Skor 4/soal).
+  6. Bagian VI: 5 Uraian (Skor 5/soal). Menuntut penalaran HOTS.
+`;
+                }
+
+                const systemInstruction = `Bertindaklah sebagai Pakar Evaluasi Pendidikan dan Guru Utama Madrasah Ibtidaiyah (MI) profesional.
+Tugas Anda adalah membuat Naskah Soal Ujian Akhir Semester II / Sumatif Akhir Semester (SAS) Genap LENGKAP dan SIAP CETAK berformat HTML murni sesuai Juknis Resmi.
+
+${juknisInstruction}
+
+KAIDAH TATA BACA & FORMATTING KHUSUS JUKNIS:
+1. Font yang digunakan adalah Arial, ukuran 12pt, line-height 1.5.
+2. Tanda titik-titik di AKHIR pertanyaan ditulis 3 kali lalu titik kembali: "... ."
+3. Tanda titik-titik di TENGAH pertanyaan ditulis 3 kali: "..."
+4. Tingkat Kognitif: L1 (30%), L2 (50%), L3 / HOTS (20%).
+5. Bahasa Indonesia baku yang komunikatif dan ramah anak usia MI/SD serta berkarakter islami.
+6. Buat elemen HTML bersih dan rapi (kop-header, h2, h3, ol, li, table). HANYA kembalikan JSON tanpa kalimat obrolan/markdown di luar objek JSON.`;
+
+                const userPrompt = `Buatkan Naskah Soal SAS Genap Resmi untuk:
+- Nama Madrasah: ${madrasah}
+- Mata Pelajaran: ${mapel}
+- Tingkat Kelas: Kelas ${kelasNum} (${isKelasBawah ? 'Kelas Bawah' : 'Kelas Atas'})
+- Semester / Tahun: ${semester}
+- Alokasi Waktu: ${waktu}
+
+MATRIKS MATERI & KISI-KISI:
+${kisikisi || "Analisis kisi-kisi dari foto yang dilampirkan."}
+
+FORMAT KOP SURAT SOAL HTML:
+Sertakan Kop Surat Madrasah di bagian paling atas dengan garis ganda tebal, diikuti Petunjuk Umum pengerjaan.`;
+
+                let contentsParts = [{ text: userPrompt }];
+
+                if (selectedBase64Image) {
+                    const base64Clean = selectedBase64Image.split(',')[1];
+                    const mimeType = selectedBase64Image.split(';')[0].split(':')[1] || 'image/jpeg';
+                    contentsParts.push({
+                        inlineData: {
+                            mimeType: mimeType,
+                            data: base64Clean
+                        }
+                    });
+                }
+
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+                statusText.innerText = `AI sedang menyusun ${isKelasBawah ? '35' : '45'} soal presisi Juknis & kunci jawaban...`;
+
+                const payload = {
+                    contents: [{ parts: contentsParts }],
+                    systemInstruction: { parts: [{ text: systemInstruction }] },
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                "soal_html": { "type": "STRING" },
+                                "kunci_html": { "type": "STRING" }
+                            },
+                            "propertyOrdering": ["soal_html", "kunci_html"]
+                        }
+                    }
+                };
+
+                // Fetch dengan retry mechanism (auto backoff)
+                let response, result;
+                let retries = 3;
+                let delay = 1000;
+
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        result = await response.json();
+                        if (response.ok && !result.error) break;
+                        if (result.error) {
+                            if (i === retries - 1) throw new Error(result.error.message || "Gagal dari API Gemini AI.");
+                        }
+                    } catch (fetchErr) {
+                        if (i === retries - 1) throw fetchErr;
+                    }
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+
+                if (result?.error) {
+                    throw new Error(result.error.message || "Terjadi kesalahan pada layanan AI.");
+                }
+
+                let jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!jsonText) {
+                    const finishReason = result?.candidates?.[0]?.finishReason;
+                    if (finishReason && finishReason !== "STOP") {
+                        throw new Error(`Proses terhenti oleh AI (${finishReason}). Coba persingkat teks kisi-kisi.`);
+                    }
+                    throw new Error("Gagal menerima respon dari Gemini AI. Silakan coba lagi.");
+                }
+
+                // Saring markdown codeblock jika ada
+                jsonText = jsonText.replace(/```json/gi, '').replace(/```html/gi, '').replace(/```/g, '').trim();
+
+                const parsed = JSON.parse(jsonText);
+
+                generatedData.soalHtml = parsed.soal_html || "";
+                generatedData.kunciHtml = parsed.kunci_html || "";
+
+                if (!generatedData.soalHtml) {
+                    throw new Error("Naskah soal yang dihasilkan kosong. Coba klik generate kembali.");
+                }
+
+                document.getElementById('paper-content').innerHTML = generatedData.soalHtml;
+                document.getElementById('kunci-content').innerHTML = generatedData.kunciHtml;
+
+                // Enable action buttons
+                document.getElementById('btn-print').disabled = false;
+                document.getElementById('btn-copy').disabled = false;
+                document.getElementById('btn-export-word').disabled = false;
+                document.getElementById('btn-edit-mode').disabled = false;
+
+                switchTab('tab-soal');
+                showToast(`Naskah soal SAS Kelas ${kelasNum} berhasil dibuat!`, "success");
+
+            } catch (err) {
+                console.error(err);
+                showToast("Terjadi kesalahan: " + err.message, "error");
+            } finally {
+                statusBox.classList.add('hidden');
+                btnGen.disabled = false;
+            }
+        }
+
+        function toggleEditMode() {
+            isEditModeActive = !isEditModeActive;
+            const soalView = document.getElementById('view-soal');
+            const kunciView = document.getElementById('view-kunci');
+            const btnText = document.getElementById('text-edit-mode');
+
+            if (isEditModeActive) {
+                soalView.setAttribute('contenteditable', 'true');
+                kunciView.setAttribute('contenteditable', 'true');
+                btnText.innerText = "Mode Edit (On)";
+                showToast("Mode Edit Aktif! Klik langsung pada naskah soal untuk mengedit.", "info");
+            } else {
+                soalView.setAttribute('contenteditable', 'false');
+                kunciView.setAttribute('contenteditable', 'false');
+                btnText.innerText = "Mode Edit (Off)";
+                showToast("Mode Edit Dinonaktifkan.", "info");
+            }
+        }
+
+        function exportToWord() {
+            const activeTabIsSoal = !document.getElementById('view-soal').classList.contains('hidden');
+            const targetContent = activeTabIsSoal ? document.getElementById('paper-content').innerHTML : document.getElementById('kunci-content').innerHTML;
+            const filename = activeTabIsSoal ? "Naskah_Soal_SAS_F4.doc" : "Kunci_Jawaban_SAS_F4.doc";
+
+            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
+                "xmlns:w='urn:schemas-microsoft-com:office:word' " +
+                "xmlns='http://www.w3.org/TR/REC-html40'>" +
+                "<head><meta charset='utf-8'><title>Export Word</title>" +
+                "<style>" +
+                "@page { size: 215.9mm 330.2mm; margin: 2.5cm 2cm 2cm 2cm; }" +
+                "body { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; }" +
+                "table { border-collapse: collapse; width: 100%; }" +
+                "td, th { border: 1px solid black; padding: 5px; font-size: 11pt; }" +
+                ".kop-header { text-align: center; border-bottom: 3px double black; padding-bottom: 8px; margin-bottom: 15px; }" +
+                ".pg-bawah-option { display: block; margin-left: 1.2rem; }" +
+                "</style></head><body>";
+            
+            const footer = "</body></html>";
+            const sourceHTML = header + targetContent + footer;
+
+            const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+            const fileDownload = document.createElement("a");
+            document.body.appendChild(fileDownload);
+            fileDownload.href = source;
+            fileDownload.download = filename;
+            fileDownload.click();
+            document.body.removeChild(fileDownload);
+
+            showToast("File Word berhasil dibuat dan diunduh!", "success");
+        }
+
+        function copyGeneratedText() {
+            const activeTabIsSoal = !document.getElementById('view-soal').classList.contains('hidden');
+            const targetEl = activeTabIsSoal ? document.getElementById('paper-content') : document.getElementById('kunci-content');
+            
+            if (!targetEl) return;
+
+            const text = targetEl.innerText;
+            
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            showToast("Teks berhasil disalin ke clipboard!", "success");
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            let bgClass = "bg-slate-800 text-slate-100 border-slate-700";
+            if (type === 'success') bgClass = "bg-slate-800 text-emerald-400 border-emerald-500/30";
+            if (type === 'error') bgClass = "bg-slate-800 text-rose-400 border-rose-500/30";
+            if (type === 'info') bgClass = "bg-slate-800 text-amber-400 border-amber-500/30";
+
+            toast.className = `${bgClass} border px-4 py-2.5 rounded-lg text-xs font-semibold shadow-2xl transition-all duration-300 pointer-events-auto flex items-center gap-2`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info text-sm"></i> ${message}`;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
